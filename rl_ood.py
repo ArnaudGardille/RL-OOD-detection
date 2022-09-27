@@ -17,8 +17,10 @@ import joblib
 from copy import copy
 from gym.wrappers import TimeLimit
 from tqdm import tqdm, trange
-from skmultiflow.lazy import KNNRegressor
-from skmultiflow.meta.multi_output_learner import MultiOutputLearner
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.multioutput import MultiOutputRegressor
+#from skmultiflow.lazy import KNNRegressor
+#from skmultiflow.meta.multi_output_learner import MultiOutputLearner
 
 path = Path.cwd()
 device = 'cpu'
