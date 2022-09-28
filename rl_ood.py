@@ -21,6 +21,8 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.multioutput import MultiOutputRegressor
 #from skmultiflow.lazy import KNNRegressor
 #from skmultiflow.meta.multi_output_learner import MultiOutputLearner
+import scipy.integrate as integrate
+from scipy import stats
 
 path = Path.cwd()
 device = 'cpu'
@@ -205,5 +207,98 @@ class Memory(gym.Wrapper):
         else:
             return self.history_obs, self.history_action
     
+
+
+def create_dataset(env, nb_steps = 10000, memory_size = 10):
     
+    obs_limits = get_space_limits(env.observation_space)  
+    act_limits = get_space_limits(env.action_space)
+    env = Memory(env, memory_size)
+    state_size = env.obs_limits[0].shape[0]
+    action_size = env.act_limits[0].shape[0]
+    
+    input_size = memory_size*(state_size+action_size)
+
+    X = np.zeros((nb_steps, input_size))
+    y = np.zeros((nb_steps, state_size))
+
+    
+    observation = env.reset()
+
+    pbar = trange(nb_steps)
+    for t in pbar:
+
+        action = env.action_space.sample()
+        previous_obs = observation
+        observation, reward, terminated, info = env.step(action)
+        history = env.get_history(True).reshape(input_size)
+
+        real_diff = np.array(observation-previous_obs)
+
+        X[t] = history
+        y[t] = real_diff
+
+        if terminated:
+            observation = env.reset()
+
+    return X, y
+
+
+def compute_p_values(X):
+    """
+    p_value for the normal distribution
+    X is supposed to be normalized
+    """
+    t = - np.abs(X)
+    p_value = 2.0 * stats.norm.cdf(t)
+    return p_value
+
+def martingale(p_values):
+        func = lambda x : np.prod(x * (p_values ** (x-1)))
+        result = integrate.quad(func, 0, 1)
+        return result[0]
+
+
+class MartingaleOODDetector():
+    def __init__(self, env: gym.Env, verbose=True, *args, **kwargs) -> None:
+
+        self.verbose = verbose
+
+        # training the model
+        X_pred, y_pred = create_dataset(env, nb_steps=10000)
+        self.pred_model = MultiOutputRegressor(KNeighborsRegressor()).fit(X_pred, y_pred)
+        #self.conf_model = conf_model
+
+        in_distrib_score = self.test_ood(env)
+
+        self.anomaly_threshold = 2.0*in_distrib_score
+
+        if self.verbose:
+            print("Anomaly score of the training distribution: ", in_distrib_score)
+
+    def test_ood(self, env, nb_steps=1000):
+        X_val, y_val = create_dataset(env, nb_steps)
+        errors = np.abs((self.pred_model.predict(X_val) - y_val))
+
+        if self.verbose:
+            print("Absolute error")
+            print("Mean: ", errors.mean())
+            print("Std: ", errors.std())
+            print()
+
+
+        # Calibration of the ood detector
+        ood_score = martingale(compute_p_values(errors/errors.std()))   
+        print("corrected score ", np.log10(ood_score)/nb_steps)
+        return ood_score
+
+
+    def save(self, path):
+        np.save(path / 'nonconformity_scores.npy', self.nonconformity_scores)
+        
+    def load(self, path):
+        self.nonconformity_scores = np.load(path / 'nonconformity_scores.npy')
+
+env = instanciate_cartpole(default_values)
+ood_detector = MartingaleOODDetector(env)
 
