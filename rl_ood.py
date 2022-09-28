@@ -260,7 +260,7 @@ def martingale(p_values):
 
 
 class MartingaleOODDetector():
-    def __init__(self, env: gym.Env, verbose=True, *args, **kwargs) -> None:
+    def __init__(self, env: gym.Env, verbose=False, *args, **kwargs) -> None:
 
         self.verbose = verbose
 
@@ -269,14 +269,15 @@ class MartingaleOODDetector():
         self.pred_model = MultiOutputRegressor(KNeighborsRegressor()).fit(X_pred, y_pred)
         #self.conf_model = conf_model
 
-        in_distrib_score = self.test_ood(env)
-
-        self.anomaly_threshold = 2.0*in_distrib_score
+        self.in_distrib_score = self.test_ood(env)
 
         if self.verbose:
-            print("Anomaly score of the training distribution: ", in_distrib_score)
+            print("Anomaly score of the training distribution: ", self.in_distrib_score)
 
-    def test_ood(self, env, nb_steps=1000):
+    def get_in_distrib_score(self):
+        return self.in_distrib_score
+
+    def test_ood(self, env, nb_steps=100):
         X_val, y_val = create_dataset(env, nb_steps)
         errors = np.abs((self.pred_model.predict(X_val) - y_val))
 
@@ -288,8 +289,9 @@ class MartingaleOODDetector():
 
 
         # Calibration of the ood detector
-        ood_score = martingale(compute_p_values(errors/errors.std()))   
-        print("corrected score ", np.log10(ood_score)/nb_steps)
+        pre_ood_score = martingale(compute_p_values(errors/errors.std()))   
+        ood_score = np.log(1 + pre_ood_score)/nb_steps
+        #print("corrected score ", np.log10(ood_score)/nb_steps)
         return ood_score
 
 
