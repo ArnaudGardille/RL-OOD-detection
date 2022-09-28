@@ -299,6 +299,5 @@ class MartingaleOODDetector():
     def load(self, path):
         self.nonconformity_scores = np.load(path / 'nonconformity_scores.npy')
 
-env = instanciate_cartpole(default_values)
-ood_detector = MartingaleOODDetector(env)
+
 
