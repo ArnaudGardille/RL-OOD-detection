@@ -209,7 +209,7 @@ class Memory(gym.Wrapper):
     
 
 
-def create_dataset(env, nb_steps = 10000, memory_size = 10):
+def create_dataset(env, nb_steps = 10000, memory_size = 10, verbose=False):
     
     obs_limits = get_space_limits(env.observation_space)  
     act_limits = get_space_limits(env.action_space)
@@ -224,9 +224,7 @@ def create_dataset(env, nb_steps = 10000, memory_size = 10):
 
     
     observation = env.reset()
-
-    pbar = trange(nb_steps)
-    for t in pbar:
+    for t in range(nb_steps):
 
         action = env.action_space.sample()
         previous_obs = observation
