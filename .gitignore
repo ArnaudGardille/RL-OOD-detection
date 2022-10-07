@@ -28,6 +28,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 *.npy
+*.DS_Store
 *.zip
 MANIFEST
 
