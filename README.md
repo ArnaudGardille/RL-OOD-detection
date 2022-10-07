@@ -11,4 +11,4 @@ We test our method on the benchmark proposed in 'Benchmark for Out-of-Distributi
 TODO:
 - investigate the correlation between the ood score and the decreasing of the reward
 - propose a gym wrapper to de online ood detection
-- compare our results to the ones of https://arxiv.org/abs/2112.02694
+- Complete the comparison between the benchmark and our results.
