@@ -23,6 +23,8 @@ from sklearn.multioutput import MultiOutputRegressor
 #from skmultiflow.meta.multi_output_learner import MultiOutputLearner
 import scipy.integrate as integrate
 from scipy import stats
+from scipy import integrate
+
 
 path = Path.cwd()
 device = 'cpu'
