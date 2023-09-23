@@ -106,13 +106,32 @@ def instanciate_pendulum_old(gravity, mass_pole, length_pole, max_speed, max_tor
     return env
 
 def instanciate_pendulum(config):
-    env = gym.make("Pendulum-v1").env
+    env = gym.make("Pendulum-v1") #.env
     env.max_speed = config['Max_speed']
     env.max_torque = config['Max_torque']
     env.g = config['Gravity']
     env.m = config['Mass_pole']
     env.l = config['Length_pole']
+    return env
+
+def get_mountain_car_values():
+    default_values = {}
+    values = {}
+
+    default_values['Gravity'] = 0.0025
+    values['Gravity'] = [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.07, 0.1]
+
+    default_values['Force'] = 0.001
+    values['Force'] = [0.0001, 0.0005, 0.005, 0.01, 0.05, 0.1]
+
+    return default_values, values
+
+def instanciate_mountain_car(config):
+    env = gym.make("MountainCar-v0").env
+    env.force = config['Force']
+    env.gravity = config['Gravity']
     return env.env
+
 
 def get_possible_combinaisons(values):
     return [x for x in product(*list(values.values()))]
@@ -144,13 +163,14 @@ def evaluate(env, agent, nb_episodes=100, render=False):
     
     for ep in range(nb_episodes):
         total_reward = 0.0
-        observation = env.reset()
+        observation, _ = env.reset()
         terminated = False
         
         while terminated is False:
             action, _state = agent.predict(observation)
             #action = env.action_space.sample()
-            observation, reward, terminated, info = env.step(action)
+            observation, reward, terminated, truncated, info = env.step(action)
+            terminated = terminated or truncated
             total_reward += reward
 
             if render:
