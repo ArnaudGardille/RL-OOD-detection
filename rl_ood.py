@@ -25,6 +25,12 @@ import scipy.integrate as integrate
 from scipy import stats
 from scipy import integrate
 
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("error", category=RuntimeWarning)
+
 CARTPOLE_VALUES = {
     'Gravity' : 9.8,
     'Mass_cart' : 1.0,
@@ -50,7 +56,8 @@ device = 'cpu'
 def create_ood_values(default_values, n=5,):
     results = {}
     for k, v, in default_values.items():
-        results[k] = [v*2**i for i in range(-n, 0)] + [v*2**i for i in range(1, n+1)]
+        results[k] = np.delete(v*np.logspace(-1, 1, num=21), 10)
+        #results[k] = [v*2**i for i in range(-n, 0)] + [v*2**i for i in range(1, n+1)]
     return results
     
 
@@ -154,6 +161,13 @@ def get_mountain_car_values():
 
 def instanciate_mountain_car(config, limit=1000):
     env = gym.make("MountainCar-v0").env
+    env.force = config['Force']
+    env.gravity = config['Gravity']
+    env = TimeLimit(env, limit)
+    return env
+
+def instanciate_mountain_car_continuous(config, limit=1000):
+    env = gym.make("MountainCarContinuous-v0").env
     env.force = config['Force']
     env.gravity = config['Gravity']
     env = TimeLimit(env, limit)
@@ -304,6 +318,7 @@ def martingale(p_values):
         return result[0]
 
 
+
 class MartingaleOODDetector():
     def __init__(self, env: gym.Env, verbose=False, *args, **kwargs) -> None:
 
@@ -322,7 +337,7 @@ class MartingaleOODDetector():
     def get_in_distrib_score(self):
         return self.in_distrib_score
 
-    def test_ood(self, env, nb_steps=100):
+    def test_ood(self, env, nb_steps=1000):
         """
         Compute the ood score
         """
@@ -342,13 +357,13 @@ class MartingaleOODDetector():
         #print("corrected score ", np.log10(ood_score)/nb_steps)
         return ood_score
 
-    def stop_above_threshold(self, env, threshold, nb_steps=100):
+    def stop_above_threshold(self, env, threshold, start_at=50, nb_steps=1000):
         """
         Compute the number of step for the ood score to go above the threshold
         """
         X_val, y_val = create_dataset(env, nb_steps)
 
-        for step in range(nb_steps):
+        for step in range(start_at,nb_steps):
             errors = np.abs((self.pred_model.predict(X_val[:step]) - y_val[:step]))
 
             if self.verbose:
@@ -360,11 +375,11 @@ class MartingaleOODDetector():
 
             # Calibration of the ood detector
             pre_ood_score = martingale(compute_p_values(errors))   
-            ood_score = nb_steps * np.log(1 + pre_ood_score) #/nb_steps
+            ood_score = step * np.log(1 + pre_ood_score) #/nb_steps
             #print("corrected score ", np.log10(ood_score)/nb_steps)
             if ood_score > threshold:
-                return step
-        return nb_steps
+                return step, ood_score
+        return nb_steps, ood_score
 
     def save(self, path):
         np.save(path / 'nonconformity_scores.npy', self.nonconformity_scores)
