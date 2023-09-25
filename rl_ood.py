@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sklearn
 from itertools import product
-from stable_baselines3 import A2C, DQN
+from stable_baselines3 import A2C, DQN, PPO
 from pathlib import Path
 import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
@@ -25,10 +25,34 @@ import scipy.integrate as integrate
 from scipy import stats
 from scipy import integrate
 
+CARTPOLE_VALUES = {
+    'Gravity' : 9.8,
+    'Mass_cart' : 1.0,
+    'Length_pole' : 0.5,
+    'Mass_pole' : 0.1,
+    'Force_magnitude' : 10.0,
+}
+PENDULUM_VALUES = {
+    'Gravity': 10.0,
+    'Mass_pole': 1.0,
+    'Length_pole': 1.0,
+    'Max_speed': 8.0,
+    'Max_torque': 2.0,
+}
+MOUNTAIN_CAR_VALUES = {
+    'Gravity': 0.0025,
+    'Force': 0.001,
+}
 
 path = Path.cwd()
 device = 'cpu'
 
+def create_ood_values(default_values, n=5,):
+    results = {}
+    for k, v, in default_values.items():
+        results[k] = [v*2**i for i in range(-n, 0)] + [v*2**i for i in range(1, n+1)]
+    return results
+    
 
 def get_cartpole_values():
     default_values = {}
@@ -105,14 +129,15 @@ def instanciate_pendulum_old(gravity, mass_pole, length_pole, max_speed, max_tor
     env.l = length_pole
     return env
 
-def instanciate_pendulum(config):
+def instanciate_pendulum(config, limit=1000):
     env = gym.make("Pendulum-v1").env
     env.max_speed = config['Max_speed']
     env.max_torque = config['Max_torque']
     env.g = config['Gravity']
     env.m = config['Mass_pole']
     env.l = config['Length_pole']
-    return env.env
+    env = TimeLimit(env, limit)
+    return env
 
 
 def get_mountain_car_values():
@@ -127,11 +152,12 @@ def get_mountain_car_values():
 
     return default_values, values
 
-def instanciate_mountain_car(config):
+def instanciate_mountain_car(config, limit=1000):
     env = gym.make("MountainCar-v0").env
     env.force = config['Force']
     env.gravity = config['Gravity']
-    return env.env
+    env = TimeLimit(env, limit)
+    return env
 
 
 def get_possible_combinaisons(values):
@@ -297,6 +323,9 @@ class MartingaleOODDetector():
         return self.in_distrib_score
 
     def test_ood(self, env, nb_steps=100):
+        """
+        Compute the ood score
+        """
         X_val, y_val = create_dataset(env, nb_steps)
         errors = np.abs((self.pred_model.predict(X_val) - y_val))
 
@@ -313,6 +342,29 @@ class MartingaleOODDetector():
         #print("corrected score ", np.log10(ood_score)/nb_steps)
         return ood_score
 
+    def stop_above_threshold(self, env, threshold, nb_steps=100):
+        """
+        Compute the number of step for the ood score to go above the threshold
+        """
+        X_val, y_val = create_dataset(env, nb_steps)
+
+        for step in range(nb_steps):
+            errors = np.abs((self.pred_model.predict(X_val[:step]) - y_val[:step]))
+
+            if self.verbose:
+                print("Absolute error")
+                print("Mean: ", errors.mean())
+                print("Std: ", errors.std())
+                print()
+
+
+            # Calibration of the ood detector
+            pre_ood_score = martingale(compute_p_values(errors))   
+            ood_score = nb_steps * np.log(1 + pre_ood_score) #/nb_steps
+            #print("corrected score ", np.log10(ood_score)/nb_steps)
+            if ood_score > threshold:
+                return step
+        return nb_steps
 
     def save(self, path):
         np.save(path / 'nonconformity_scores.npy', self.nonconformity_scores)

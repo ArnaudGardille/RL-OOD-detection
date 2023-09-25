@@ -105,14 +105,15 @@ def instanciate_pendulum_old(gravity, mass_pole, length_pole, max_speed, max_tor
     env.l = length_pole
     return env
 
-def instanciate_pendulum(config):
+def instanciate_pendulum(config, limit=1000):
     env = gym.make("Pendulum-v1").env
     env.max_speed = config['Max_speed']
     env.max_torque = config['Max_torque']
     env.g = config['Gravity']
     env.m = config['Mass_pole']
     env.l = config['Length_pole']
-    return env.env
+    env = TimeLimit(env, limit)
+    return env
 
 
 def get_mountain_car_values():
