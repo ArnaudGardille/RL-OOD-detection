@@ -1,4 +1,5 @@
-import gym #gymnasium as
+#import gym #gymnasium as
+import gymnasium as gym
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -15,7 +16,7 @@ import os
 import pandas as pd
 import joblib
 from copy import copy
-from gym.wrappers import TimeLimit
+from gymnasium.wrappers import TimeLimit
 from tqdm import tqdm, trange
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.multioutput import MultiOutputRegressor
@@ -56,7 +57,8 @@ device = 'cpu'
 def create_ood_values(default_values, n=5,):
     results = {}
     for k, v, in default_values.items():
-        results[k] = np.delete(v*np.logspace(-1, 1, num=21), 10)
+        results[k] = v*np.logspace(-1, 1, num=21)
+        #results[k] = np.delete(v*np.logspace(-1, 1, num=21), 10)
         #results[k] = [v*2**i for i in range(-n, 0)] + [v*2**i for i in range(1, n+1)]
     return results
     
@@ -187,10 +189,10 @@ def get_ood_configs(default_values, values):
         
         for value in values[key]:
             ood_config = copy(default_values)
-            if value != default_values[key]:
-                ood_config[key] = value
-                ood_config['change'] = key
-                ood_configs.append(ood_config)
+            #if value != default_values[key]:
+            ood_config[key] = value
+            ood_config['change'] = key
+            ood_configs.append(ood_config)
                 #changes.append({key:value})
 
     return ood_configs #, changes
@@ -200,7 +202,6 @@ def get_ood_configs(default_values, values):
 
 def evaluate(env, agent, nb_episodes=1000, render=False):
     total_rewards = []
-    observation = env.reset()
     
     for ep in range(nb_episodes):
         total_reward = 0.0
