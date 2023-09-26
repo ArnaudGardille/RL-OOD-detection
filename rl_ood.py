@@ -205,13 +205,14 @@ def evaluate(env, agent, nb_episodes=1000, render=False):
     
     for ep in range(nb_episodes):
         total_reward = 0.0
-        observation = env.reset()
+        observation, _ = env.reset()
         terminated = False
         
         while terminated is False:
             action, _state = agent.predict(observation, deterministic=True)
             #action = env.action_space.sample()
-            observation, reward, terminated, info = env.step(action)
+            observation, reward, terminated, truncated, info = env.step(action)
+            terminated = terminated or truncated
             total_reward += reward
 
             if render:
@@ -242,7 +243,8 @@ class Memory(gym.Wrapper):
         self.action_size = self.act_limits[0].shape[0]
        
     def step(self, action):
-        obs, reward, done, info = self.env.step(action)
+        obs, reward, done, trunc, info = self.env.step(action)
+        done = done or trunc
         
         self.history_obs = np.roll(self.history_obs, -self.state_size)
         self.history_obs[-1] = obs
@@ -254,13 +256,13 @@ class Memory(gym.Wrapper):
             print(self.history_obs)
             print(self.history_action)
         
-        return obs, reward, done, info
+        return obs, reward, done, False, info
 
     def reset(self, *args, **kwargs):
-        observation = self.env.reset(*args, **kwargs)
+        observation, _ = self.env.reset(*args, **kwargs)
         self.history_obs = np.full((self.size, self.state_size), observation)
         self.history_action = np.full((self.size, self.action_size), 0)
-        return observation
+        return observation, None
         
 
     def get_history(self, concat=False):
@@ -285,12 +287,13 @@ def create_dataset(env, nb_steps = 10000, memory_size = 10, verbose=False):
     y = np.zeros((nb_steps, state_size))
 
     
-    observation = env.reset()
+    observation, _ = env.reset()
     for t in range(nb_steps):
 
         action = env.action_space.sample()
         previous_obs = observation
-        observation, reward, terminated, info = env.step(action)
+        observation, reward, terminated, truncated, info = env.step(action)
+        terminated = terminated or truncated
         history = env.get_history(True).reshape(input_size)
 
         real_diff = np.array(observation-previous_obs)
@@ -299,7 +302,7 @@ def create_dataset(env, nb_steps = 10000, memory_size = 10, verbose=False):
         y[t] = real_diff
 
         if terminated:
-            observation = env.reset()
+            observation, _ = env.reset()
 
     return X, y
 
