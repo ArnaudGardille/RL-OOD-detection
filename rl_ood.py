@@ -1,5 +1,8 @@
 #import gym #gymnasium as
 import gymnasium as gym
+#import gym
+from gymnasium.wrappers import TransformReward, TimeLimit
+#from gym.wrappers import TimeLimit
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -16,7 +19,6 @@ import os
 import pandas as pd
 import joblib
 from copy import copy
-from gymnasium.wrappers import TimeLimit
 from tqdm import tqdm, trange
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.multioutput import MultiOutputRegressor
@@ -25,6 +27,7 @@ from sklearn.multioutput import MultiOutputRegressor
 import scipy.integrate as integrate
 from scipy import stats
 from scipy import integrate
+import pygame
 
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -84,19 +87,8 @@ def get_cartpole_values():
 
     return default_values, values
 
-def instanciate_cartpole_old(gravity, mass_cart, length_pole, mass_pole, force_magnitude):
-    env = gym.make("CartPole-v1")
-    env.gravity = gravity
-    env.masscart = mass_cart
-    env.masspole = mass_pole
-    env.total_mass = env.masspole + env.masscart
-    env.length = length_pole  # actually half the pole's length
-    env.polemass_length = env.masspole * env.length
-    env.force_mag = force_magnitude
-    return env
-
-def instanciate_cartpole(config, limit=1000):
-    env = gym.make("CartPole-v1").env
+def instanciate_cartpole(config, limit=200, render_mode=None):
+    env = gym.make("CartPole-v1", render_mode=render_mode).env
     env.gravity = config['Gravity']
     env.masscart = config['Mass_cart']
     env.masspole = config['Mass_pole']
@@ -129,23 +121,16 @@ def get_pendulum_values():
 
     return default_values, values
 
-def instanciate_pendulum_old(gravity, mass_pole, length_pole, max_speed, max_torque):
-    env = gym.make("Pendulum-v1")
-    env.max_speed = max_speed
-    env.max_torque = max_torque
-    env.g = gravity
-    env.m = mass_pole
-    env.l = length_pole
-    return env
 
-def instanciate_pendulum(config, limit=1000):
-    env = gym.make("Pendulum-v1").env
+def instanciate_pendulum(config, limit=200, render_mode=None):
+    env = gym.make("Pendulum-v1", render_mode=render_mode).env
     env.max_speed = config['Max_speed']
     env.max_torque = config['Max_torque']
     env.g = config['Gravity']
     env.m = config['Mass_pole']
     env.l = config['Length_pole']
     env = TimeLimit(env, limit)
+    env = TransformReward(env, lambda x:(x+17)/17)
     return env
 
 
@@ -161,15 +146,15 @@ def get_mountain_car_values():
 
     return default_values, values
 
-def instanciate_mountain_car(config, limit=1000):
-    env = gym.make("MountainCar-v0").env
+def instanciate_mountain_car(config, limit=200, render_mode=None):
+    env = gym.make("MountainCar-v0", render_mode=render_mode).env
     env.force = config['Force']
     env.gravity = config['Gravity']
     env = TimeLimit(env, limit)
     return env
 
-def instanciate_mountain_car_continuous(config, limit=1000):
-    env = gym.make("MountainCarContinuous-v0").env
+def instanciate_mountain_car_continuous(config, limit=200, render_mode=None):
+    env = gym.make("MountainCarContinuous-v0", render_mode=render_mode).env
     env.force = config['Force']
     env.gravity = config['Gravity']
     env = TimeLimit(env, limit)
