@@ -29,7 +29,8 @@ share/python-wheels/
 *.egg
 *.npy
 *.DS_Store
-#*.zip
+*.png
+*.zip
 MANIFEST
 
 test.hf/

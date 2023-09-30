@@ -1,14 +1,13 @@
-#import gym #gymnasium as
-import gymnasium as gym
+import gym #gymnasium as
+#import gymnasium as gym
 #import gym
-from gymnasium.wrappers import TransformReward, TimeLimit
-#from gym.wrappers import TimeLimit
+from gym.wrappers import TimeLimit
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import sklearn
 from itertools import product
-from stable_baselines3 import A2C, DQN, PPO
+from stable_baselines3 import A2C, DQN, DDPG
 from pathlib import Path
 import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
@@ -57,6 +56,24 @@ MOUNTAIN_CAR_VALUES = {
 path = Path.cwd()
 device = 'cpu'
 
+class TransformReward(gym.RewardWrapper):
+    def __init__(self, env: gym.Env, f):
+        super().__init__(env)
+        assert callable(f)
+        self.f = f
+
+    def reward(self, reward):
+        return self.f(reward)
+
+class ObjectiveReward(gym.Wrapper):
+    def __init__(self, env):
+        super().__init__(env)
+
+    def step(self, action):
+        obs,reward, terminated, info = self.env.step(action)
+        reward = float(terminated)
+        return obs, reward, terminated, info
+
 def create_ood_values(default_values, n=5,):
     results = {}
     for k, v, in default_values.items():
@@ -88,7 +105,8 @@ def get_cartpole_values():
     return default_values, values
 
 def instanciate_cartpole(config, limit=200, render_mode=None):
-    env = gym.make("CartPole-v1", render_mode=render_mode).env
+    #env = gym.make("CartPole-v1").env
+    env = gym.make("CartPole-v1").env
     env.gravity = config['Gravity']
     env.masscart = config['Mass_cart']
     env.masspole = config['Mass_pole']
@@ -123,7 +141,7 @@ def get_pendulum_values():
 
 
 def instanciate_pendulum(config, limit=200, render_mode=None):
-    env = gym.make("Pendulum-v1", render_mode=render_mode).env
+    env = gym.make("Pendulum-v1").env
     env.max_speed = config['Max_speed']
     env.max_torque = config['Max_torque']
     env.g = config['Gravity']
@@ -147,17 +165,19 @@ def get_mountain_car_values():
     return default_values, values
 
 def instanciate_mountain_car(config, limit=200, render_mode=None):
-    env = gym.make("MountainCar-v0", render_mode=render_mode).env
+    env = gym.make("MountainCar-v0").env
     env.force = config['Force']
     env.gravity = config['Gravity']
     env = TimeLimit(env, limit)
+    env = ObjectiveReward(env)
     return env
 
 def instanciate_mountain_car_continuous(config, limit=200, render_mode=None):
-    env = gym.make("MountainCarContinuous-v0", render_mode=render_mode).env
+    env = gym.make("MountainCarContinuous-v0").env
     env.force = config['Force']
     env.gravity = config['Gravity']
     env = TimeLimit(env, limit)
+    env = ObjectiveReward(env)
     return env
 
 
@@ -190,14 +210,16 @@ def evaluate(env, agent, nb_episodes=1000, render=False):
     
     for ep in range(nb_episodes):
         total_reward = 0.0
-        observation, _ = env.reset()
+        #observation, _ = env.reset()
+        observation = env.reset()
         terminated = False
         
         while terminated is False:
             action, _state = agent.predict(observation, deterministic=True)
             #action = env.action_space.sample()
-            observation, reward, terminated, truncated, info = env.step(action)
-            terminated = terminated or truncated
+            observation, reward, terminated, info = env.step(action)
+            #observation, reward, terminated, truncated, info = env.step(action)
+            #terminated = terminated or truncated
             total_reward += reward
 
             if render:
@@ -228,8 +250,8 @@ class Memory(gym.Wrapper):
         self.action_size = self.act_limits[0].shape[0]
        
     def step(self, action):
-        obs, reward, done, trunc, info = self.env.step(action)
-        done = done or trunc
+        obs, reward, done, info = self.env.step(action)
+        #done = done or trunc
         
         self.history_obs = np.roll(self.history_obs, -self.state_size)
         self.history_obs[-1] = obs
@@ -244,7 +266,7 @@ class Memory(gym.Wrapper):
         return obs, reward, done, False, info
 
     def reset(self, *args, **kwargs):
-        observation, _ = self.env.reset(*args, **kwargs)
+        observation = self.env.reset(*args, **kwargs)
         self.history_obs = np.full((self.size, self.state_size), observation)
         self.history_action = np.full((self.size, self.action_size), 0)
         return observation, None
@@ -272,13 +294,13 @@ def create_dataset(env, nb_steps = 10000, memory_size = 10, verbose=False):
     y = np.zeros((nb_steps, state_size))
 
     
-    observation, _ = env.reset()
+    observation = env.reset()
     for t in range(nb_steps):
 
         action = env.action_space.sample()
         previous_obs = observation
-        observation, reward, terminated, truncated, info = env.step(action)
-        terminated = terminated or truncated
+        observation, reward, terminated, info = env.step(action)
+        #terminated = terminated or truncated
         history = env.get_history(True).reshape(input_size)
 
         real_diff = np.array(observation-previous_obs)
@@ -287,7 +309,7 @@ def create_dataset(env, nb_steps = 10000, memory_size = 10, verbose=False):
         y[t] = real_diff
 
         if terminated:
-            observation, _ = env.reset()
+            observation = env.reset()
 
     return X, y
 
