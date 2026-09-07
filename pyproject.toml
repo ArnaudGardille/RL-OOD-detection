@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ood-rl"
+version = "0.0.1"
+description = "Online OOD environment detection and adaptation for RL (JAX-hybrid core, framework-agnostic detection)."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "jax>=0.4",
+    "gymnax>=0.0.8",
+    "numpy",
+    "scipy",
+    "scikit-learn",
+]
+
+[project.optional-dependencies]
+# Neural dynamics models / agents land in Phase 1+; kept out of the core install.
+nn = ["flax", "optax", "chex"]
+agents = ["rejax"]
+dev = ["pytest"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["ood_rl"]
